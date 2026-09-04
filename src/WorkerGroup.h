@@ -1,16 +1,28 @@
 #ifndef WORKERGROUP_H
 #define WORKERGROUP_H
 
-class WorkerGroup : WorkItem {
+#include <vector>
+#include "WorkItem.h"
+
+class WorkerGroup : public WorkItem {
 
 private:
-	WorkItem children;
-	TradingTechnique tradingTechnique;
+	std::vector<WorkItem*> children;
 
 public:
-	void add(WorkItem item);
+	~WorkerGroup();
 
-	void remove(WorkItem item);
+	void add(WorkItem* item);
+
+	void remove(WorkItem* item);
+
+	void onPriceUpdate(std::string ticker, double price) override;
+
+	void decide() override;
+
+	double getBalanceContribution() override;
+
+	WorkItemIterator* createIterator(std::string mode);
 };
 
 #endif

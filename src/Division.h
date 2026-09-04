@@ -1,10 +1,14 @@
 #ifndef DIVISION_H
 #define DIVISION_H
 
-class Division : WorkerGroup {
+#include "WorkerGroup.h"
+
+class Division : public WorkerGroup {
 
 private:
-	String tickerFocus;
+	std::string tickerFocus;
+public:
+	Division(std::string tickerFocus);
 };
 
 #endif
