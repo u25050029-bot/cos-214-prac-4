@@ -1,17 +1,22 @@
 #ifndef WORKITEM_H
 #define WORKITEM_H
 
+#include <string>
+#include "WorkItemIterator.h"
+
 class WorkItem {
 
 
 public:
-	void onPriceUpdate(String ticker, double price);
+	virtual ~WorkItem() = default;
 
-	void decide();
+	virtual void onPriceUpdate(std::string ticker, double price) = 0;
 
-	WorkItemIterator createIterator(IteratorMode mode);
+	virtual void decide() = 0;
 
-	void getBalanceContribution();
+	virtual WorkItemIterator* createIterator(std::string mode) = 0;
+
+	virtual double getBalanceContribution() = 0;
 };
 
 #endif
