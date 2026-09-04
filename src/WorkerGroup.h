@@ -3,9 +3,11 @@
 
 class WorkerGroup : WorkItem {
 
-public:
+private:
 	WorkItem children;
+	TradingTechnique tradingTechnique;
 
+public:
 	void add(WorkItem item);
 
 	void remove(WorkItem item);
