@@ -5,7 +5,7 @@ class IdleState : WorkerState {
 
 
 public:
-	void handleUpdate();
+	void handleUpdate(Worker context, double price);
 };
 
 #endif

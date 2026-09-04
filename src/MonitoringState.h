@@ -5,7 +5,7 @@ class MonitoringState : WorkerState {
 
 
 public:
-	void handleUpdate();
+	void handleUpdate(Worker context, double price);
 };
 
 #endif
