@@ -15,7 +15,7 @@ public:
 
 	void onPriceUpdate(std::string ticker, double price) override;
 
-	void subscribeAll();
+	double getFundBalance() const;
 
 	void adjustBalance(double amount);
 };

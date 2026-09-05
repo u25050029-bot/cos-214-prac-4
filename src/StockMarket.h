@@ -1,15 +1,27 @@
 #ifndef STOCKMARKET_H
 #define STOCKMARKET_H
 
-class StockMarket {
+#include <string>
+#include <map>
+#include <vector>
+#include "MarketSubject.h"
+#include "MarketObserver.h"
 
+class StockMarket : public MarketSubject
+{
+private:
+    std::map<std::string, std::vector<MarketObserver *>> observers;
+    std::map<std::string, double> prices;
 
 public:
-	void getCurrentStock(String ticker);
+    void attach(MarketObserver *observer, std::string ticker) override;
+    void detach(MarketObserver *observer, std::string ticker) override;
+    void notify(std::string ticker, double price) override;
 
-	double getStockPrice(String ticker);
+    void setStockPrice(std::string ticker, double price);
+    double getStockPrice(std::string ticker);
 
-	void subscribe(MarketObserver observer, String ticker);
+    void tick(std::string ticker, double price);
 };
 
 #endif
