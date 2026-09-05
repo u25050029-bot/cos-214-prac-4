@@ -5,7 +5,8 @@ class MarketObserver {
 
 
 public:
-	void onPriceUpdate(String ticker, double price);
+	virtual ~MarketObserver() = default;
+	void onPriceUpdate(String ticker, double price)=0;
 };
 
 #endif
