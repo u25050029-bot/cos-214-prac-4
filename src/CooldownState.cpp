@@ -1,6 +1,23 @@
 #include "CooldownState.h"
+#include "IdleState.h"
+#include "Worker.h"
 
-void CooldownState::handleUpdate(Worker context, double price) {
-	// TODO - implement CooldownState::handleUpdate
-	throw "Not yet implemented";
+CooldownState::CooldownState(int ticks)
+{
+    this->ticksRemaining = ticks;
+}
+
+void CooldownState::handleUpdate(Worker *context, double price)
+{
+    context->recordPrice(price);
+    ticksRemaining--;
+    if (ticksRemaining <= 0)
+    {
+        context->setState(new IdleState());
+    }
+}
+
+std::string CooldownState::name() const
+{
+    return "Cooldown";
 }

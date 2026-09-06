@@ -1,13 +1,22 @@
 #ifndef SIGNALREADYITERATOR_H
 #define SIGNALREADYITERATOR_H
 
-class SignalReadyIterator : WorkItemIterator {
+#include <vector>
+#include "WorkItemIterator.h"
 
+class WorkItem;
+
+class SignalReadyIterator : public WorkItemIterator
+{
+private:
+    std::vector<WorkItem *> snapshot;
+    std::size_t position;
 
 public:
-	void hasNext();
+    SignalReadyIterator(WorkItem *root);
 
-	void next();
+    bool hasNext() override;
+    WorkItem *next() override;
 };
 
 #endif

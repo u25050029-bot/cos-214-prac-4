@@ -1,11 +1,24 @@
 #include "FullTraversalIterator.h"
+#include "WorkItem.h"
 
-void FullTraversalIterator::hasNext() {
-	// TODO - implement FullTraversalIterator::hasNext
-	throw "Not yet implemented";
+FullTraversalIterator::FullTraversalIterator(WorkItem *root) : position(0)
+{
+    if (root != nullptr)
+    {
+        root->flatten(snapshot);
+    }
 }
 
-void FullTraversalIterator::next() {
-	// TODO - implement FullTraversalIterator::next
-	throw "Not yet implemented";
+bool FullTraversalIterator::hasNext()
+{
+    return position < snapshot.size();
+}
+
+WorkItem *FullTraversalIterator::next()
+{
+    if (!hasNext())
+    {
+        return nullptr;
+    }
+    return snapshot[position++];
 }

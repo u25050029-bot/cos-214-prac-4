@@ -48,8 +48,3 @@ Signal ComplianceReviewDecorator::execute(Signal decision)
     }
     return result;
 }
-
-void ComplianceReviewDecorator::restrict(const std::string &ticker)
-{
-    restrictedList.push_back(ticker);
-}
