@@ -1,58 +1,43 @@
 #include "WorkerDecorator.h"
 
-WorkerDecorator::WorkerDecorator(WorkItem *wrapped) : wrapped(wrapped) {}
+WorkerDecorator::WorkerDecorator(WorkItem* wrapped) : wrapped(wrapped) {}
 
-WorkerDecorator::~WorkerDecorator()
-{
+WorkerDecorator::~WorkerDecorator() {
     delete wrapped;
 }
 
-void WorkerDecorator::onPriceUpdate(std::string ticker, double price)
-{
+void WorkerDecorator::onPriceUpdate(std::string ticker, double price) {
     wrapped->onPriceUpdate(ticker, price);
 }
 
-void WorkerDecorator::decide()
-{
+void WorkerDecorator::decide() {
     wrapped->decide();
 }
 
-WorkItemIterator *WorkerDecorator::createIterator(std::string mode)
-{
+WorkItemIterator* WorkerDecorator::createIterator(std::string mode) {
     return wrapped->createIterator(mode);
 }
 
-double WorkerDecorator::getBalanceContribution()
-{
+double WorkerDecorator::getBalanceContribution() {
     return wrapped->getBalanceContribution();
 }
 
-void WorkerDecorator::flatten(std::vector<WorkItem *> &out)
-{
+void WorkerDecorator::collectSignals(std::vector<Signal>& out) {
+    wrapped->collectSignals(out);
+}
+
+void WorkerDecorator::flatten(std::vector<WorkItem*>& out) {
     wrapped->flatten(out);
 }
 
-bool WorkerDecorator::isSignalReady() const
-{
+bool WorkerDecorator::isSignalReady() const {
     return wrapped->isSignalReady();
 }
 
-std::string WorkerDecorator::report() const
-{
+std::string WorkerDecorator::report() const {
     return wrapped->report();
 }
 
-void WorkerDecorator::addWatchTicker(const std::string &ticker)
-{
+void WorkerDecorator::addWatchTicker(const std::string& ticker) {
     wrapped->addWatchTicker(ticker);
-}
-
-void WorkerDecorator::consumeSignals(std::vector<Signal> &out)
-{
-    wrapped->consumeSignals(out);
-}
-
-std::vector<std::string> WorkerDecorator::getTickers() const
-{
-    return wrapped->getTickers();
 }

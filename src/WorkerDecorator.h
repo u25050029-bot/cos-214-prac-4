@@ -4,25 +4,23 @@
 #include <string>
 #include "WorkItem.h"
 
-class WorkerDecorator : public WorkItem
-{
+class WorkerDecorator : public WorkItem {
 protected:
-    WorkItem *wrapped;
+    WorkItem* wrapped;
 
 public:
-    WorkerDecorator(WorkItem *wrapped);
+    WorkerDecorator(WorkItem* wrapped);
     ~WorkerDecorator() override;
 
     void onPriceUpdate(std::string ticker, double price) override;
     void decide() override;
-    WorkItemIterator *createIterator(std::string mode) override;
+    WorkItemIterator* createIterator(std::string mode) override;
     double getBalanceContribution() override;
-    void consumeSignals(std::vector<Signal> &out) override;
-    void flatten(std::vector<WorkItem *> &out) override;
+    void collectSignals(std::vector<Signal>& out) override;
+    void flatten(std::vector<WorkItem*>& out) override;
     bool isSignalReady() const override;
     std::string report() const override;
-    void addWatchTicker(const std::string &ticker) override;
-    std::vector<std::string> getTickers() const override;
+    void addWatchTicker(const std::string& ticker) override;
 };
 
 #endif

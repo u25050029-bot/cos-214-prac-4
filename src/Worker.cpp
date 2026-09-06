@@ -6,177 +6,124 @@
 #include <algorithm>
 
 Worker::Worker(std::string workerId, std::string ticker, std::size_t referenceWindow)
-{
-    this->workerId = workerId;
-    this->state = new IdleState();
-    this->referenceWindow = referenceWindow;
-    this->lastPrice = 0.0;
-    this->hasPending = false;
-    this->signalExecuted = false;
-    if (!ticker.empty())
-    {
+    : workerId(workerId), state(new IdleState()), referenceWindow(referenceWindow),
+      lastPrice(0.0), hasPending(false) {
+    if (!ticker.empty()) {
         watchlist.push_back(ticker);
     }
 }
 
-Worker::~Worker()
-{
+Worker::~Worker() {
     delete state;
 }
 
-void Worker::setState(WorkerState *newState)
-{
-    if (newState == state)
-    {
+void Worker::setState(WorkerState* newState) {
+    if (newState == state) {
         return;
     }
     delete state;
     state = newState;
 }
 
-WorkerState *Worker::getState() const
-{
+WorkerState* Worker::getState() const {
     return state;
 }
 
-bool Worker::watches(const std::string &ticker) const
-{
+bool Worker::watches(const std::string& ticker) const {
     return std::find(watchlist.begin(), watchlist.end(), ticker) != watchlist.end();
 }
 
-void Worker::addTicker(const std::string &ticker)
-{
-    if (!watches(ticker))
-    {
+void Worker::addTicker(const std::string& ticker) {
+    if (!watches(ticker)) {
         watchlist.push_back(ticker);
     }
 }
 
-double Worker::getReferenceAverage() const
-{
-    if (recentPrices.empty())
-    {
+double Worker::getReferenceAverage() const {
+    if (recentPrices.empty()) {
         return 0.0;
     }
     double sum = 0.0;
-    for (double p : recentPrices)
-    {
+    for (double p : recentPrices) {
         sum += p;
     }
     return sum / static_cast<double>(recentPrices.size());
 }
 
-void Worker::recordPrice(double price)
-{
+void Worker::recordPrice(double price) {
     lastPrice = price;
     recentPrices.push_back(price);
-    while (recentPrices.size() > referenceWindow)
-    {
+    while (recentPrices.size() > referenceWindow) {
         recentPrices.pop_front();
     }
 }
 
-double Worker::getLastPrice() const
-{
+double Worker::getLastPrice() const {
     return lastPrice;
 }
 
-std::string Worker::getId() const
-{
+std::string Worker::getId() const {
     return workerId;
 }
 
-void Worker::raiseSignal(SignalType type, double quantity)
-{
+void Worker::raiseSignal(SignalType type, double quantity) {
     pendingSignal = Signal(watchlist.empty() ? "" : watchlist.front(), type, "now", quantity);
     hasPending = true;
-    signalExecuted = false;
 }
 
-void Worker::clearSignal()
-{
+void Worker::clearSignal() {
     hasPending = false;
-    signalExecuted = false;
     pendingSignal = Signal();
 }
 
-bool Worker::hasSignal() const
-{
+bool Worker::hasSignal() const {
     return hasPending;
 }
 
-Signal Worker::getSignal() const
-{
+Signal Worker::getSignal() const {
     return pendingSignal;
 }
 
-void Worker::onPriceUpdate(std::string ticker, double price)
-{
-    if (!watches(ticker))
-    {
+void Worker::onPriceUpdate(std::string ticker, double price) {
+    if (!watches(ticker)) {
         return;
     }
     state->handleUpdate(this, price);
 }
 
-void Worker::decide()
-{
-  return;
+void Worker::decide() {
+
 }
 
-WorkItemIterator *Worker::createIterator(std::string mode)
-{
-    if (mode == "signal")
-    {
+WorkItemIterator* Worker::createIterator(std::string mode) {
+    if (mode == "signal") {
         return new SignalReadyIterator(this);
     }
     return new FullTraversalIterator(this);
 }
 
-double Worker::getBalanceContribution()
-{
+double Worker::getBalanceContribution() {
     return 0.0;
 }
 
-void Worker::flatten(std::vector<WorkItem *> &out)
-{
+void Worker::collectSignals(std::vector<Signal>& out) {
+    if (hasPending && pendingSignal.isActive()) {
+        out.push_back(pendingSignal);
+    }
+}
+
+void Worker::flatten(std::vector<WorkItem*>& out) {
     out.push_back(this);
 }
 
-bool Worker::isSignalReady() const
-{
+bool Worker::isSignalReady() const {
     return state != nullptr && state->isSignalReady();
 }
 
-std::string Worker::report() const
-{
-    std::string label = workerId + " [" + (state ? state->name() : "null") + "]";
-    if (hasPending && pendingSignal.isActive())
-    {
-        label += " signal=" + pendingSignal.typeName();
-    }
-    else
-    {
-        label += " signal=none";
-    }
-    return label;
+std::string Worker::report() const {
+    return workerId + " [" + (state ? state->name() : "null") + "]";
 }
 
-void Worker::addWatchTicker(const std::string &ticker)
-{
+void Worker::addWatchTicker(const std::string& ticker) {
     addTicker(ticker);
-}
-
-void Worker::consumeSignals(std::vector<Signal> &out)
-{
-    if (hasPending && pendingSignal.isActive() && !signalExecuted)
-    {
-        out.push_back(pendingSignal);
-        signalExecuted = true;
-    }
-}
-
-std::vector<std::string> Worker::getTickers() const
-{
-    return watchlist;
 }
