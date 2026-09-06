@@ -2,22 +2,28 @@
 #define TRADINGTECHNIQUE_H
 
 #include <string>
+#include <set>
 #include "WorkerGroup.h"
 #include "MarketObserver.h"
 
+class StockMarket;
 
-class TradingTechnique : public WorkerGroup, public MarketObserver {
-
+class TradingTechnique : public WorkerGroup, public MarketObserver
+{
 private:
-	double fundBalance;
+    double fundBalance;
+    std::set<std::string> tickers;
+
 public:
-	TradingTechnique(double startingBalance);
+    TradingTechnique(double startingBalance);
 
-	void onPriceUpdate(std::string ticker, double price) override;
+    void onPriceUpdate(std::string ticker, double price) override;
 
-	double getFundBalance() const;
+    void registerTicker(std::string ticker);
+    void subscribeAll(StockMarket *market);
 
-	void adjustBalance(double amount);
+    void adjustBalance(double amount);
+    double getFundBalance() const;
 };
 
 #endif

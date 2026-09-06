@@ -1,11 +1,13 @@
 #ifndef IDLESTATE_H
 #define IDLESTATE_H
 
-class IdleState : WorkerState {
+#include "WorkerState.h"
 
-
+class IdleState : public WorkerState
+{
 public:
-	void handleUpdate(Worker context, double price);
+    void handleUpdate(Worker *context, double price) override;
+    std::string name() const override;
 };
 
 #endif

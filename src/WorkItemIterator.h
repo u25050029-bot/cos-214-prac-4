@@ -1,13 +1,15 @@
 #ifndef WORKITEMITERATOR_H
 #define WORKITEMITERATOR_H
 
-class WorkItemIterator {
+class WorkItem;
 
-
+class WorkItemIterator
+{
 public:
-	void hasNext();
+    virtual ~WorkItemIterator() = default;
 
-	void next();
+    virtual bool hasNext() = 0;
+    virtual WorkItem *next() = 0;
 };
 
 #endif

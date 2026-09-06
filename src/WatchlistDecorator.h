@@ -1,14 +1,19 @@
 #ifndef WATCHLISTDECORATOR_H
 #define WATCHLISTDECORATOR_H
 
-class WatchlistDecorator : WorkerDecorator {
+#include <string>
+#include <vector>
+#include "WorkerDecorator.h"
+
+class WatchlistDecorator : public WorkerDecorator
+{
+private:
+    std::vector<std::string> extraTickers;
 
 public:
-	String extraTickers;
+    WatchlistDecorator(WorkItem *wrapped, std::vector<std::string> extraTickers);
 
-	void onPriceUpdate();
-
-	void decide();
+    void onPriceUpdate(std::string ticker, double price) override;
 };
 
 #endif

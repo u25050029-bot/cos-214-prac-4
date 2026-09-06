@@ -1,16 +1,21 @@
 #ifndef RISKMANAGEMENTDECORATOR_H
 #define RISKMANAGEMENTDECORATOR_H
 
-class RiskManagementDecorator : WorkerDecorator {
+#include "TradeExecutor.h"
+#include "Signal.h"
 
+class RiskManagementDecorator : public TradeExecutor
+{
 private:
-	double maxTradePct;
-	double maxTickerExposure;
+    TradeExecutor *inner;
+    double maxTradePct;
+    double maxTickerExposure;
 
 public:
-	void onPriceUpdate();
+    RiskManagementDecorator(TradeExecutor *inner, double maxTradePct, double maxTickerExposure);
+    ~RiskManagementDecorator() override;
 
-	void decide();
+    Signal execute(Signal decision) override;
 };
 
 #endif

@@ -1,13 +1,22 @@
 #ifndef FULLTRAVERSALITERATOR_H
 #define FULLTRAVERSALITERATOR_H
 
-class FullTraversalIterator : WorkItemIterator {
+#include <vector>
+#include "WorkItemIterator.h"
 
+class WorkItem;
+
+class FullTraversalIterator : public WorkItemIterator
+{
+private:
+    std::vector<WorkItem *> snapshot;
+    std::size_t position;
 
 public:
-	void hasNext();
+    FullTraversalIterator(WorkItem *root);
 
-	void next();
+    bool hasNext() override;
+    WorkItem *next() override;
 };
 
 #endif

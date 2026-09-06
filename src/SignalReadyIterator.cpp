@@ -1,11 +1,32 @@
 #include "SignalReadyIterator.h"
+#include "WorkItem.h"
 
-void SignalReadyIterator::hasNext() {
-	// TODO - implement SignalReadyIterator::hasNext
-	throw "Not yet implemented";
+SignalReadyIterator::SignalReadyIterator(WorkItem *root) : position(0)
+{
+    if (root != nullptr)
+    {
+        std::vector<WorkItem *> all;
+        root->flatten(all);
+        for (WorkItem *item : all)
+        {
+            if (item->isSignalReady())
+            {
+                snapshot.push_back(item);
+            }
+        }
+    }
 }
 
-void SignalReadyIterator::next() {
-	// TODO - implement SignalReadyIterator::next
-	throw "Not yet implemented";
+bool SignalReadyIterator::hasNext()
+{
+    return position < snapshot.size();
+}
+
+WorkItem *SignalReadyIterator::next()
+{
+    if (!hasNext())
+    {
+        return nullptr;
+    }
+    return snapshot[position++];
 }

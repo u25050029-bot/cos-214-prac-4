@@ -1,11 +1,17 @@
 #ifndef COOLDOWNSTATE_H
 #define COOLDOWNSTATE_H
 
-class CooldownState : WorkerState {
+#include "WorkerState.h"
 
+class CooldownState : public WorkerState
+{
+private:
+    int ticksRemaining;
 
 public:
-	void handleUpdate(Worker context, double price);
+    CooldownState(int ticks = 3);
+    void handleUpdate(Worker *context, double price) override;
+    std::string name() const override;
 };
 
 #endif

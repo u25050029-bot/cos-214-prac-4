@@ -1,11 +1,18 @@
 #include "WatchlistDecorator.h"
 
-void WatchlistDecorator::onPriceUpdate() {
-	// TODO - implement WatchlistDecorator::onPriceUpdate
-	throw "Not yet implemented";
+WatchlistDecorator::WatchlistDecorator(WorkItem *wrapped, std::vector<std::string> extraTickers)
+    : WorkerDecorator(wrapped)
+{
+    this->extraTickers = extraTickers;
+
+    for (std::size_t t = 0; t < extraTickers.size(); ++t)
+    {
+        wrapped->addWatchTicker(extraTickers[t]);
+    }
 }
 
-void WatchlistDecorator::decide() {
-	// TODO - implement WatchlistDecorator::decide
-	throw "Not yet implemented";
+void WatchlistDecorator::onPriceUpdate(std::string ticker, double price)
+{
+
+    WorkerDecorator::onPriceUpdate(ticker, price);
 }
