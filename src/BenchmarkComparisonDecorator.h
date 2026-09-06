@@ -1,16 +1,35 @@
 #ifndef BENCHMARKCOMPARISONDECORATOR_H
 #define BENCHMARKCOMPARISONDECORATOR_H
 
-class BenchmarkComparisonDecorator : WorkerDecorator {
+#include <string>
+#include <vector>
+#include "WorkerDecorator.h"
+#include "Signal.h"
+
+class BenchmarkComparisonDecorator : public WorkerDecorator {
+private:
+    std::string trackedTicker;
+    std::string indexTicker;
+    double indexBaseline;
+    double trackedBaseline;
+    double indexPrice;
+    double trackedPrice;
+    bool haveIndex;
+    bool haveTracked;
+    bool benchmarkSignalRaised;
+    SignalType benchmarkSignalType;
+
+    void compareGrowth();
 
 public:
-	String indexTicker;
+    BenchmarkComparisonDecorator(WorkItem* wrapped, std::string trackedTicker,
+                                 std::string indexTicker, double trackedBaseline,
+                                 double indexBaseline);
 
-	void compareGrowth();
+    void onPriceUpdate(std::string ticker, double price) override;
+    void collectSignals(std::vector<Signal>& out) override;
 
-	void onPriceUpdate();
-
-	void decide();
+    bool hasBenchmarkSignal() const;
 };
 
 #endif
