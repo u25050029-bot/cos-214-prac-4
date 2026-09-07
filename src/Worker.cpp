@@ -7,7 +7,7 @@
 
 Worker::Worker(std::string workerId, std::string ticker, std::size_t referenceWindow)
     : workerId(workerId), state(new IdleState()), referenceWindow(referenceWindow),
-      lastPrice(0.0), hasPending(false) {
+      lastPrice(0.0), hasPending(false), signalExecuted(false) {
     if (!ticker.empty()) {
         watchlist.push_back(ticker);
     }
@@ -69,10 +69,12 @@ std::string Worker::getId() const {
 void Worker::raiseSignal(SignalType type, double quantity) {
     pendingSignal = Signal(watchlist.empty() ? "" : watchlist.front(), type, "now", quantity);
     hasPending = true;
+    signalExecuted = false;
 }
 
 void Worker::clearSignal() {
     hasPending = false;
+    signalExecuted = false;
     pendingSignal = Signal();
 }
 
@@ -106,12 +108,6 @@ double Worker::getBalanceContribution() {
     return 0.0;
 }
 
-void Worker::collectSignals(std::vector<Signal>& out) {
-    if (hasPending && pendingSignal.isActive()) {
-        out.push_back(pendingSignal);
-    }
-}
-
 void Worker::flatten(std::vector<WorkItem*>& out) {
     out.push_back(this);
 }
@@ -121,9 +117,22 @@ bool Worker::isSignalReady() const {
 }
 
 std::string Worker::report() const {
-    return workerId + " [" + (state ? state->name() : "null") + "]";
+    std::string label = workerId + " [" + (state ? state->name() : "null") + "]";
+    if (hasPending && pendingSignal.isActive()) {
+        label += " signal=" + pendingSignal.typeName();
+    } else {
+        label += " signal=none";
+    }
+    return label;
 }
 
 void Worker::addWatchTicker(const std::string& ticker) {
     addTicker(ticker);
+}
+
+void Worker::consumeSignals(std::vector<Signal>& out) {
+    if (hasPending && pendingSignal.isActive() && !signalExecuted) {
+        out.push_back(pendingSignal);
+        signalExecuted = true;
+    }
 }
