@@ -19,7 +19,7 @@ public:
     void decide() override;
     WorkItemIterator* createIterator(std::string mode) override;
     double getBalanceContribution() override;
-    void collectSignals(std::vector<Signal>& out) override;
+    void consumeSignals(std::vector<Signal>& out) override;
     void flatten(std::vector<WorkItem*>& out) override;
     std::string report() const override;
     void addWatchTicker(const std::string& ticker) override;

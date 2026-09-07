@@ -22,10 +22,6 @@ double WorkerDecorator::getBalanceContribution() {
     return wrapped->getBalanceContribution();
 }
 
-void WorkerDecorator::collectSignals(std::vector<Signal>& out) {
-    wrapped->collectSignals(out);
-}
-
 void WorkerDecorator::flatten(std::vector<WorkItem*>& out) {
     wrapped->flatten(out);
 }
@@ -40,4 +36,8 @@ std::string WorkerDecorator::report() const {
 
 void WorkerDecorator::addWatchTicker(const std::string& ticker) {
     wrapped->addWatchTicker(ticker);
+}
+
+void WorkerDecorator::consumeSignals(std::vector<Signal>& out) {
+    wrapped->consumeSignals(out);
 }

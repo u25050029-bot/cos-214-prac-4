@@ -2,13 +2,11 @@
 #include "ExecutingState.h"
 #include "Worker.h"
 
-void SignalDetectedState::handleUpdate(Worker *context, double price)
-{
+void SignalDetectedState::handleUpdate(Worker* context, double price) {
     double reference = context->getReferenceAverage();
     context->recordPrice(price);
 
-    if (!context->hasSignal())
-    {
+    if (!context->hasSignal()) {
 
         SignalType type = (price >= reference) ? SignalType::BUY : SignalType::SELL;
         context->raiseSignal(type, 1.0);
@@ -16,20 +14,17 @@ void SignalDetectedState::handleUpdate(Worker *context, double price)
     }
 
     SignalType raised = context->getSignal().getType();
-    bool stillValid = (raised == SignalType::BUY && price >= reference) ||
-                      (raised == SignalType::SELL && price < reference);
-    if (stillValid)
-    {
+    bool stillValid = (raised == SignalType::BUY  && price >= reference) ||
+                      (raised == SignalType::SELL && price <  reference);
+    if (stillValid) {
         context->setState(new ExecutingState());
     }
 }
 
-std::string SignalDetectedState::name() const
-{
+std::string SignalDetectedState::name() const {
     return "SignalDetected";
 }
 
-bool SignalDetectedState::isSignalReady() const
-{
+bool SignalDetectedState::isSignalReady() const {
     return true;
 }

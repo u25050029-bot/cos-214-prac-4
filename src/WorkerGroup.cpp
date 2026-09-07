@@ -47,12 +47,6 @@ double WorkerGroup::getBalanceContribution() {
     return total;
 }
 
-void WorkerGroup::collectSignals(std::vector<Signal>& out) {
-    for (WorkItem* child : children) {
-        child->collectSignals(out);
-    }
-}
-
 void WorkerGroup::flatten(std::vector<WorkItem*>& out) {
     for (WorkItem* child : children) {
         child->flatten(out);
@@ -66,5 +60,11 @@ std::string WorkerGroup::report() const {
 void WorkerGroup::addWatchTicker(const std::string& ticker) {
     for (WorkItem* child : children) {
         child->addWatchTicker(ticker);
+    }
+}
+
+void WorkerGroup::consumeSignals(std::vector<Signal>& out) {
+    for (WorkItem* child : children) {
+        child->consumeSignals(out);
     }
 }

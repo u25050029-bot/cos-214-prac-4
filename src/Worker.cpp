@@ -117,13 +117,7 @@ bool Worker::isSignalReady() const {
 }
 
 std::string Worker::report() const {
-    std::string label = workerId + " [" + (state ? state->name() : "null") + "]";
-    if (hasPending && pendingSignal.isActive()) {
-        label += " signal=" + pendingSignal.typeName();
-    } else {
-        label += " signal=none";
-    }
-    return label;
+    return workerId + " [" + (state ? state->name() : "null") + "]";
 }
 
 void Worker::addWatchTicker(const std::string& ticker) {

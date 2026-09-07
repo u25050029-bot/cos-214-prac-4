@@ -19,6 +19,7 @@ private:
     double lastPrice;
     Signal pendingSignal;
     bool hasPending;
+    bool signalExecuted;
 
 public:
     Worker(std::string workerId, std::string ticker, std::size_t referenceWindow = 5);
@@ -45,7 +46,7 @@ public:
     void decide() override;
     WorkItemIterator* createIterator(std::string mode) override;
     double getBalanceContribution() override;
-    void collectSignals(std::vector<Signal>& out) override;
+    void consumeSignals(std::vector<Signal>& out) override;
     void flatten(std::vector<WorkItem*>& out) override;
     bool isSignalReady() const override;
     std::string report() const override;

@@ -18,7 +18,7 @@ public:
 
     virtual double getBalanceContribution() = 0;
 
-    virtual void collectSignals(std::vector<Signal>& out) = 0;
+    virtual void consumeSignals(std::vector<Signal>& out) = 0;
 
     virtual void flatten(std::vector<WorkItem*>& out) = 0;
 

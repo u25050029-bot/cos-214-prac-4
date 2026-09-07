@@ -3,11 +3,17 @@
 #include <vector>
 #include <cstdlib>
 
+#include "Signal.h"
 #include "StockMarket.h"
 #include "TradingTechnique.h"
+#include "WorkerGroup.h"
 #include "Division.h"
 #include "Worker.h"
+#include "IdleState.h"
 #include "MonitoringState.h"
+#include "SignalDetectedState.h"
+#include "ExecutingState.h"
+#include "CooldownState.h"
 #include "WorkItemIterator.h"
 #include "PairRelationDecorator.h"
 #include "WatchlistDecorator.h"
@@ -18,329 +24,170 @@
 #include "ComplianceReviewDecorator.h"
 #include "Trader.h"
 
-static void fullTraversal(WorkItem *root)
-{
-    std::cout << "  [full traversal] every work item:" << std::endl;
-    WorkItemIterator *it = root->createIterator("full");
-    while (it->hasNext())
-    {
-        std::cout << "      " << it->next()->report() << std::endl;
-    }
-    delete it;
-}
+// ===========================================================================
+// Event model
+// ---------------------------------------------------------------------------
+// Each event represents the kind of price move that drives a particular state
+// transition. Prices are expressed relative to a fixed baseline (100.0) so the
+// transition each event triggers is deterministic regardless of ordering.
+// ===========================================================================
+static const double BASE = 100.0;
 
-static void signalOnlyTraversal(WorkItem *root)
-{
-    std::cout << "  [signal-ready traversal] only items with a signal:" << std::endl;
-    WorkItemIterator *it = root->createIterator("signal");
-    bool any = false;
-    while (it->hasNext())
-    {
-        any = true;
-        std::cout << "      " << it->next()->report() << std::endl;
-    }
-    if (!any)
-        std::cout << "      (none currently signal-ready)" << std::endl;
-    delete it;
-}
-
-struct Instrument
-{
-    std::string ticker;
-    double baseline;
+enum EventKind {
+    EV_CALM = 0,      // < 0.5% move: keeps Idle idle / drifts Monitoring back to Idle
+    EV_STIR,          // ~1.2% move: Idle -> Monitoring
+    EV_SURGE,         // ~3% up:     Monitoring -> SignalDetected (BUY side)
+    EV_PLUNGE,        // ~3% down:   Monitoring -> SignalDetected (SELL side)
+    EV_CONFIRM_UP,    // stays high: SignalDetected -> Executing -> Cooldown -> Idle
+    EV_CONFIRM_DOWN,  // stays low:  same, on the SELL side
+    EV_KIND_COUNT
 };
 
-static const Instrument NVDA = {"NVDA", 120.0}; // nvidia
-static const Instrument AMD = {"AMD", 160.0};   // amd
-static const Instrument KO = {"KO", 60.0};      // coke
-static const Instrument PEP = {"PEP", 55.0};    // pepsi
-static const Instrument SPX = {"SPX", 5000.0};  // spx
-
-enum EventKind
-{
-    CALM = 0,  // tiny move  -> keeps Idle / drifts Monitoring back to Idle
-    STIR,      // ~1.2% move -> Idle -> Monitoring
-    RALLY,     // ~3% up     -> Monitoring -> SignalDetected (BUY)
-    SELLOFF,   // ~3% down   -> Monitoring -> SignalDetected (SELL)
-    HOLD_HIGH, // stays high -> SignalDetected -> Executing -> Cooldown -> Idle
-    HOLD_LOW,  // stays low  -> same, on the SELL side
-    EVENT_KIND_COUNT
-};
-
-static const char *eventName(EventKind kind)
-{
-    switch (kind)
-    {
-    case CALM:
-        return "CALM";
-    case STIR:
-        return "STIR";
-    case RALLY:
-        return "RALLY";
-    case SELLOFF:
-        return "SELLOFF";
-    case HOLD_HIGH:
-        return "HOLD_HIGH";
-    case HOLD_LOW:
-        return "HOLD_LOW";
-    default:
-        return "?";
+static const char* eventName(EventKind k) {
+    switch (k) {
+        case EV_CALM:         return "CALM";
+        case EV_STIR:         return "STIR";
+        case EV_SURGE:        return "SURGE";
+        case EV_PLUNGE:       return "PLUNGE";
+        case EV_CONFIRM_UP:   return "CONFIRM_UP";
+        case EV_CONFIRM_DOWN: return "CONFIRM_DOWN";
+        default:              return "?";
     }
 }
 
-// Convert an event kind into a multiplier on an instrument's baseline.
-static double eventMultiplier(EventKind kind)
-{
-    switch (kind)
-    {
-    case CALM:
-        return 1.001; // +0.1%
-    case STIR:
-        return 1.012; // +1.2%
-    case RALLY:
-        return 1.030; // +3.0%
-    case SELLOFF:
-        return 0.970; // -3.0%
-    case HOLD_HIGH:
-        return 1.035; // hold above the reference
-    case HOLD_LOW:
-        return 0.965; // hold below the reference
-    default:
-        return 1.000;
+// Map an event to the price it should push onto the market.
+static double eventToPrice(EventKind k) {
+    switch (k) {
+        case EV_CALM:         return BASE * 1.001;   // +0.1%
+        case EV_STIR:         return BASE * 1.012;   // +1.2%
+        case EV_SURGE:        return BASE * 1.030;   // +3.0%
+        case EV_PLUNGE:       return BASE * 0.970;   // -3.0%
+        case EV_CONFIRM_UP:   return BASE * 1.035;   // stay high
+        case EV_CONFIRM_DOWN: return BASE * 0.965;   // stay low
+        default:              return BASE;
     }
 }
 
-// just to simplify data
-struct MarketEvent
-{
-    Instrument instrument;
-    EventKind kind;
-};
+int main() {
+    std::cout << "TaskForge / TradingTechnique - event-driven simulation" << std::endl;
 
-int main()
-{
-    std::cout << "Stock Market Simulation" << std::endl;
+    // -----------------------------------------------------------------------
+    // 1. Create the structure: market, strategy tree, decision chain, trader.
+    // -----------------------------------------------------------------------
+    StockMarket market;
+    TradingTechnique* strategy = new TradingTechnique(1000000.0);
 
-    //
-    StockMarket exchange;
+    // A nested composite: root -> techDivision -> equitiesGroup -> Workers,
+    // plus a decorated pair branch. All workers track "SIM".
+    Division* techDivision = new Division("SIM");
+    Worker* a1 = new Worker("A1", "SIM", 8);
+    Worker* a2 = new Worker("A2", "SIM", 8);
+    a2->setState(new MonitoringState());       // start one worker in Monitoring
+    Division* equitiesGroup = new Division("EQ");
+    Worker* q1 = new Worker("Q1", "SIM", 8);
+    equitiesGroup->add(q1);
+    techDivision->add(a1);
+    techDivision->add(a2);
+    techDivision->add(equitiesGroup);
 
-    // build structure
+    // A watchlist-decorated worker widened to SIM.
+    Worker* w = new Worker("W1", "OTHER", 8);
+    std::vector<std::string> extra; extra.push_back("SIM");
+    WatchlistDecorator* watched = new WatchlistDecorator(w, extra);
 
-    // root of tree
-    TradingTechnique *momentumFund = new TradingTechnique(1000000.0); // startingBalance
+    strategy->add(techDivision);
+    strategy->add(watched);
+    strategy->registerTicker("SIM");
 
-    // Creating a division for tech stocks
-    Division *techDesk = new Division("TECH"); // tickerFocus
+    // Decision chain: Compliance -> Risk -> RealTrader.
+    TradeExecutor* real = new RealTrader();
+    TradeExecutor* risk = new RiskManagementDecorator(real, 0.5, 100.0);
+    std::vector<std::string> restricted;                 // none restricted here
+    TradeExecutor* chain = new ComplianceReviewDecorator(risk, strategy, restricted);
 
-    Worker *nvidiaLead = new Worker("nvidia-lead", NVDA.ticker, 8); // workerId, ticker, referenceWindow
+    // The Trader observes the market; a tick propagates then evaluates.
+    Trader* trader = new Trader(strategy, chain);
+    trader->subscribeTo(&market);
 
-    Worker *nvidiaMomentum = new Worker("nvidia-momentum", NVDA.ticker, 8); // workerId, ticker, referenceWindow
-    nvidiaMomentum->setState(new MonitoringState());                        // remove this maybe
+    // -----------------------------------------------------------------------
+    // 2. Define events with a "guarantee" weight (relative frequency).
+    // -----------------------------------------------------------------------
+    const int N = 200;                    // total number of events in the run
+    int weight[EV_KIND_COUNT];
+    weight[EV_CALM]         = 40;
+    weight[EV_STIR]         = 25;
+    weight[EV_SURGE]        = 12;
+    weight[EV_PLUNGE]       = 8;
+    weight[EV_CONFIRM_UP]   = 10;
+    weight[EV_CONFIRM_DOWN] = 5;
+    int weightSum = 0;
+    for (int k = 0; k < EV_KIND_COUNT; ++k) weightSum += weight[k];
 
-    Worker *amdAnalyst = new Worker("amd-analyst", AMD.ticker, 8); // workerId, ticker, referenceWindow
-
-    // A benchmark-decorated view of the AMD analyst, compared against the index.
-    BenchmarkComparisonDecorator *amdVsIndex = new BenchmarkComparisonDecorator(amdAnalyst, AMD.ticker, SPX.ticker, AMD.baseline, SPX.baseline); // wrapped, trackedTicker, indexTicker, trackedBaseline, indexBaseline
-
-    techDesk->add(nvidiaLead);
-    techDesk->add(nvidiaMomentum);
-    techDesk->add(amdVsIndex);
-
-    // Division for bevrages
-    Division *beveragesDesk = new Division("BEVERAGES"); // tickerFocus
-
-    Worker *cokeAnalyst = new Worker("coke-analyst", KO.ticker, 8); // workerId, ticker, referenceWindow
-
-    Worker *pepsiAnalyst = new Worker("pepsi-analyst", PEP.ticker, 8); // workerId, ticker, referenceWindow
-
-    beveragesDesk->add(cokeAnalyst);
-    beveragesDesk->add(pepsiAnalyst);
-
-    // Wrap the whole beverages desk in a pair-relation strategy on KO vs PEP.
-    PairRelationDecorator *beveragesPair = new PairRelationDecorator(beveragesDesk, KO.ticker, PEP.ticker, KO.baseline - PEP.baseline); // wrapped, tickerA, tickerB, historicalSpread
-
-    // An extra tech analyst whose coverage is widened at runtime: it primarily
-    // tracks NVDA, but a WatchlistDecorator subscribes it to AMD as well.
-    Worker *crossAnalyst = new Worker("cross-analyst", NVDA.ticker, 8); // workerId, ticker, referenceWindow
-    std::vector<std::string> extraTickers;
-    extraTickers.push_back(AMD.ticker);
-    WatchlistDecorator *crossCovered = new WatchlistDecorator(crossAnalyst, extraTickers); // wrapped, extraTickers
-
-    // Building the tree
-    momentumFund->add(techDesk);
-    momentumFund->add(beveragesPair);
-    momentumFund->add(crossCovered);
-
-    // Use traversal here
-    momentumFund->registerTicker(NVDA.ticker);
-    momentumFund->registerTicker(AMD.ticker);
-    momentumFund->registerTicker(KO.ticker);
-    momentumFund->registerTicker(PEP.ticker);
-    momentumFund->registerTicker(SPX.ticker);
-
-    // Decision pipeline
-    TradeExecutor *executor = new RealTrader();
-
-    TradeExecutor *riskLayer = new RiskManagementDecorator(executor, 0.5, 100.0); // inner, maxTradePct, maxTickerExposure
-
-    // Restricted list starts empty so every instrument can trade in the first
-    // half of the run; PEP gets banned at the midpoint (a runtime change).
-    std::vector<std::string> restrictedTickers;
-    ComplianceReviewDecorator *complianceLayer = new ComplianceReviewDecorator(riskLayer, momentumFund, restrictedTickers); // inner, technique, restrictedList
-    // Observer
-    Trader *deskTrader = new Trader(momentumFund, complianceLayer); // technique, chain  // will own the root
-    deskTrader->subscribeTo(&exchange);
-
-    // Creating data
-    const int TOTAL_TICKS = 200;
-    int eventWeight[EVENT_KIND_COUNT];
-    eventWeight[CALM] = 40;
-    eventWeight[STIR] = 25;
-    eventWeight[RALLY] = 12;
-    eventWeight[SELLOFF] = 8;
-    eventWeight[HOLD_HIGH] = 10;
-    eventWeight[HOLD_LOW] = 5;
-    int weightTotal = 0;
-    for (int k = 0; k < EVENT_KIND_COUNT; ++k)
-        weightTotal += eventWeight[k];
-
-    std::vector<Instrument> tradeUniverse;
-    tradeUniverse.push_back(NVDA);
-    tradeUniverse.push_back(AMD);
-    tradeUniverse.push_back(KO);
-    tradeUniverse.push_back(PEP);
-
-    std::vector<EventKind> eventKinds;
-    eventKinds.reserve(TOTAL_TICKS);
-    for (int k = 0; k < EVENT_KIND_COUNT; ++k)
-    {
-        int count = (eventWeight[k] * TOTAL_TICKS) / weightTotal;
-        for (int i = 0; i < count; ++i)
-            eventKinds.push_back((EventKind)k);
+    // -----------------------------------------------------------------------
+    // 3. Build the distribution array: N slots filled per the weights.
+    // -----------------------------------------------------------------------
+    std::vector<EventKind> events;
+    events.reserve(N);
+    for (int k = 0; k < EV_KIND_COUNT; ++k) {
+        int count = (weight[k] * N) / weightSum;
+        for (int i = 0; i < count; ++i) events.push_back((EventKind)k);
     }
-    for (int k = 0; k < EVENT_KIND_COUNT; ++k) // guarantee full coverage
-    {
+    // Guarantee at least one of every event kind (full transition coverage),
+    // and pad to exactly N with CALM if rounding left us short.
+    for (int k = 0; k < EV_KIND_COUNT; ++k) {
         bool present = false;
-        for (std::size_t i = 0; i < eventKinds.size(); ++i)
-            if (eventKinds[i] == (EventKind)k)
-            {
-                present = true;
-                break;
-            }
-        if (!present)
-            eventKinds.push_back((EventKind)k);
+        for (std::size_t i = 0; i < events.size(); ++i)
+            if (events[i] == (EventKind)k) { present = true; break; }
+        if (!present) events.push_back((EventKind)k);
     }
-    while ((int)eventKinds.size() < TOTAL_TICKS)
-        eventKinds.push_back(CALM);
-    if ((int)eventKinds.size() > TOTAL_TICKS)
-        eventKinds.resize(TOTAL_TICKS);
+    while ((int)events.size() < N) events.push_back(EV_CALM);
+    if ((int)events.size() > N) events.resize(N);
 
-    // shuffle events
-    std::srand(2026); // setting seed
-    for (int i = TOTAL_TICKS - 1; i > 0; --i)
-    {
+    // -----------------------------------------------------------------------
+    // 4. Shuffle: mix the indexes (Fisher-Yates with a fixed seed).
+    // -----------------------------------------------------------------------
+    std::srand(12345);
+    for (int i = N - 1; i > 0; --i) {
         int j = std::rand() % (i + 1);
-        EventKind tmp = eventKinds[i];
-        eventKinds[i] = eventKinds[j];
-        eventKinds[j] = tmp;
+        EventKind tmp = events[i]; events[i] = events[j]; events[j] = tmp;
     }
 
-    // process data into instrument, update
-    std::vector<MarketEvent> schedule;
-    schedule.reserve(TOTAL_TICKS);
-    for (int i = 0; i < TOTAL_TICKS; ++i)
-    {
-        Instrument instrument = tradeUniverse[i % tradeUniverse.size()];
-        MarketEvent ev = {instrument, eventKinds[i]};
-        schedule.push_back(ev);
-    }
+    // -----------------------------------------------------------------------
+    // 5. Process events into price updates.
+    // -----------------------------------------------------------------------
+    std::vector<double> prices;
+    prices.reserve(N);
+    for (int i = 0; i < N; ++i) prices.push_back(eventToPrice(events[i]));
 
     // Report the realised distribution.
-    int seen[EVENT_KIND_COUNT] = {0};
-    for (int i = 0; i < TOTAL_TICKS; ++i)
-        seen[schedule[i].kind]++;
-    std::cout << "\nEvent distribution over " << TOTAL_TICKS << " ticks:" << std::endl;
-    for (int k = 0; k < EVENT_KIND_COUNT; ++k)
+    int seen[EV_KIND_COUNT] = {0};
+    for (int i = 0; i < N; ++i) seen[events[i]]++;
+    std::cout << "\nEvent distribution over " << N << " ticks:" << std::endl;
+    for (int k = 0; k < EV_KIND_COUNT; ++k)
         std::cout << "  " << eventName((EventKind)k) << ": " << seen[k] << std::endl;
 
-    // Start of demo
-    std::cout << "\nStarting balance: " << momentumFund->getFundBalance() << std::endl;
-    std::cout << "Running " << TOTAL_TICKS << " market ticks across "
-              << tradeUniverse.size() << " instruments...\n"
-              << std::endl;
+    // -----------------------------------------------------------------------
+    // 6. The driving loop: push each price onto the market. The Trader, as an
+    //    observer, propagates it down the tree (states transition) and then
+    //    runs a decision cycle - all triggered by setStockPrice/tick.
+    // -----------------------------------------------------------------------
+    std::cout << "\nStarting balance: " << strategy->getFundBalance() << std::endl;
+    std::cout << "Running " << N << " market ticks...\n" << std::endl;
 
-    // Seed the index once so the benchmark decorator has a reference.
-    exchange.setStockPrice(SPX.ticker, SPX.baseline);
-    exchange.tick(SPX.ticker, SPX.baseline);
-
-    const int HALF = TOTAL_TICKS / 2;
-
-    // --- First half of the run --------------------------------------------
-    for (int i = 0; i < HALF; i++)
-    {
-        const MarketEvent &ev = schedule[i];
-        double price = ev.instrument.baseline * eventMultiplier(ev.kind);
-        exchange.setStockPrice(ev.instrument.ticker, price);
-        exchange.tick(ev.instrument.ticker, price); // notifies deskTrader
+    for (int i = 0; i < N; ++i) {
+        market.setStockPrice("SIM", prices[i]);
+        market.tick("SIM", prices[i]);      // notifies the Trader -> drive + evaluate
     }
 
-    // --- Runtime change at the midpoint -----------------------------------
-    // A meaningful structural + behavioural change while the system is live:
-    //   1. add a new analyst, wrapped in a watchlist + benchmark decorator,
-    //      into the fund's tree (structural change to the composite); and
-    //   2. ban PEP by adding it to compliance's restricted list (behavioural
-    //      change to the decision chain).
-    std::cout << "\n--- midpoint runtime change (tick " << HALF << ") ---" << std::endl;
+    std::cout << "\nFinal balance: " << strategy->getFundBalance() << std::endl;
 
-    Worker *lateAnalyst = new Worker("late-analyst", KO.ticker, 8); // workerId, ticker, referenceWindow
-    std::vector<std::string> lateExtra;
-    lateExtra.push_back(NVDA.ticker);
-    WatchlistDecorator *lateWatched = new WatchlistDecorator(lateAnalyst, lateExtra);                                                           // wrapped, extraTickers
-    BenchmarkComparisonDecorator *lateBenched = new BenchmarkComparisonDecorator(lateWatched, KO.ticker, SPX.ticker, KO.baseline, SPX.baseline); // wrapped, trackedTicker, indexTicker, trackedBaseline, indexBaseline
-    momentumFund->add(lateBenched);                                                                                                             // structural change: new item joins the tree
-    std::cout << "  added 'late-analyst' (watchlist + benchmark decorated) to the fund" << std::endl;
-
-    complianceLayer->restrict(PEP.ticker); // behavioural change: PEP now banned
-    std::cout << "  PEP is now restricted - further PEP trades will be vetoed" << std::endl;
-
-    // Drive a clear PEP move so the new restriction is visibly exercised. PEP
-    // needs to build its reference (window 8) first, then a confirmed drop: it
-    // would raise a SELL, but compliance now vetoes it to HOLD.
-    for (int t = 0; t < 9; ++t)
-        exchange.tick(PEP.ticker, PEP.baseline);
-    exchange.tick(PEP.ticker, PEP.baseline * 0.95);
-    exchange.tick(PEP.ticker, PEP.baseline * 0.94);
-    exchange.tick(PEP.ticker, PEP.baseline * 0.93);
-    std::cout << "--- resuming run ---\n"
-              << std::endl;
-
-    // --- Second half of the run -------------------------------------------
-    for (int i = HALF; i < TOTAL_TICKS; i++)
-    {
-        const MarketEvent &ev = schedule[i];
-        double price = ev.instrument.baseline * eventMultiplier(ev.kind);
-        exchange.setStockPrice(ev.instrument.ticker, price);
-        exchange.tick(ev.instrument.ticker, price); // notifies deskTrader
-    }
-
-    std::cout << "\nFinal balance: " << momentumFund->getFundBalance() << std::endl;
-
-    // Quick post-run inspection (also exercises the query-side API).
-    std::cout << "Last SPX price seen by the exchange: "
-              << exchange.getStockPrice(SPX.ticker) << std::endl;
-    std::cout << "Aggregate balance contribution across the tree: "
-              << momentumFund->getBalanceContribution() << std::endl;
-    momentumFund->decide(); // propagate a decide() sweep through the composite
-    fullTraversal(momentumFund);
-    signalOnlyTraversal(momentumFund);
-
-    // Unsubscribe the trader from one ticker (exercises the observer detach path).
-    exchange.detach(deskTrader, NVDA.ticker);
-
-    // cleanup
-    delete deskTrader;
-    delete complianceLayer; // deletes riskLayer -> executor
-    delete momentumFund;    // deletes the whole desk/analyst/decorator tree
+    // -----------------------------------------------------------------------
+    // 7. Cleanup (clear ownership: trader is an observer and owns nothing here;
+    //    chain owns its inner executors; strategy owns the whole tree).
+    // -----------------------------------------------------------------------
+    delete trader;
+    delete chain;
+    delete strategy;
 
     std::cout << "\nSimulation complete." << std::endl;
     return 0;
