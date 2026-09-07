@@ -6,7 +6,8 @@
 #include "WorkerDecorator.h"
 #include "Signal.h"
 
-class BenchmarkComparisonDecorator : public WorkerDecorator {
+class BenchmarkComparisonDecorator : public WorkerDecorator
+{
 private:
     std::string trackedTicker;
     std::string indexTicker;
@@ -22,14 +23,14 @@ private:
     void compareGrowth();
 
 public:
-    BenchmarkComparisonDecorator(WorkItem* wrapped, std::string trackedTicker,
+    BenchmarkComparisonDecorator(WorkItem *wrapped, std::string trackedTicker,
                                  std::string indexTicker, double trackedBaseline,
                                  double indexBaseline);
 
     void onPriceUpdate(std::string ticker, double price) override;
-    void consumeSignals(std::vector<Signal>& out) override;
-
-    bool hasBenchmarkSignal() const;
+    void consumeOwnSignal(std::vector<Signal> &out) override;
+    void flatten(std::vector<WorkItem *> &out) override;
+    bool isSignalReady() const override;
 };
 
 #endif

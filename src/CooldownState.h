@@ -9,7 +9,7 @@ private:
     int ticksRemaining;
 
 public:
-    CooldownState(int ticks = 3);
+    CooldownState(int ticks = 5);
     void handleUpdate(Worker *context, double price) override;
     std::string name() const override;
 };

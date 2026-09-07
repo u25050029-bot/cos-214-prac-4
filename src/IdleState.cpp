@@ -3,18 +3,22 @@
 #include "Worker.h"
 #include <cmath>
 
-void IdleState::handleUpdate(Worker* context, double price) {
+void IdleState::handleUpdate(Worker *context, double price)
+{
     double reference = context->getReferenceAverage();
     context->recordPrice(price);
 
-    if (reference > 0.0) {
+    if (reference > 0.0)
+    {
         double move = std::fabs(price - reference) / reference;
-        if (move >= 0.01) {
+        if (move >= 0.01)
+        {
             context->setState(new MonitoringState());
         }
     }
 }
 
-std::string IdleState::name() const {
+std::string IdleState::name() const
+{
     return "Idle";
 }

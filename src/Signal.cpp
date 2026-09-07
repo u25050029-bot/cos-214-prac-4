@@ -4,16 +4,14 @@ Signal::Signal()
 {
     this->ticker = "";
     this->type = SignalType::HOLD;
-    this->timestamp = "";
     this->quantity = 0.0;
     this->active = false;
 }
 
-Signal::Signal(std::string ticker, SignalType type, std::string timestamp, double quantity)
+Signal::Signal(std::string ticker, SignalType type, double quantity)
 {
     this->ticker = ticker;
     this->type = type;
-    this->timestamp = timestamp;
     this->quantity = quantity;
     this->active = true;
 }
@@ -26,11 +24,6 @@ std::string Signal::getTicker() const
 SignalType Signal::getType() const
 {
     return type;
-}
-
-std::string Signal::getTimestamp() const
-{
-    return timestamp;
 }
 
 double Signal::getQuantity() const
@@ -51,11 +44,6 @@ void Signal::setType(SignalType newType)
 void Signal::setQuantity(double newQuantity)
 {
     quantity = newQuantity;
-}
-
-void Signal::setActive(bool newActive)
-{
-    active = newActive;
 }
 
 std::string Signal::typeName() const
