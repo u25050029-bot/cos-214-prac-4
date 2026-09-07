@@ -46,18 +46,26 @@ void PairRelationDecorator::onPriceUpdate(std::string ticker, double price)
     recomputeSpread();
 }
 
-bool PairRelationDecorator::hasPairSignal() const
+void PairRelationDecorator::consumeOwnSignal(std::vector<Signal> &out)
 {
-    return pairSignalRaised;
-}
-
-void PairRelationDecorator::consumeSignals(std::vector<Signal> &out)
-{
-    WorkerDecorator::consumeSignals(out);
     if (pairSignalRaised)
     {
         SignalType type = (priceA - priceB > historicalSpread) ? SignalType::SELL : SignalType::BUY;
-        out.push_back(Signal(tickerA, type, "now", 1.0));
+        out.push_back(Signal(tickerA, type, 1.0));
         pairSignalRaised = false;
     }
+}
+
+void PairRelationDecorator::flatten(std::vector<WorkItem *> &out)
+{
+    WorkerDecorator::flatten(out);
+    if (pairSignalRaised)
+    {
+        out.push_back(this);
+    }
+}
+
+bool PairRelationDecorator::isSignalReady() const
+{
+    return pairSignalRaised || WorkerDecorator::isSignalReady();
 }

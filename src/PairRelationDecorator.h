@@ -23,9 +23,9 @@ public:
                           double historicalSpread);
 
     void onPriceUpdate(std::string ticker, double price) override;
-    void consumeSignals(std::vector<Signal> &out) override;
-
-    bool hasPairSignal() const;
+    void consumeOwnSignal(std::vector<Signal> &out) override;
+    void flatten(std::vector<WorkItem *> &out) override;
+    bool isSignalReady() const override;
 };
 
 #endif

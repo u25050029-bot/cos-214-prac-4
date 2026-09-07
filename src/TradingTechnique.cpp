@@ -11,19 +11,6 @@ void TradingTechnique::onPriceUpdate(std::string ticker, double price)
     WorkerGroup::onPriceUpdate(ticker, price);
 }
 
-void TradingTechnique::registerTicker(std::string ticker)
-{
-    tickers.insert(ticker);
-}
-
-void TradingTechnique::subscribeAll(StockMarket *market)
-{
-    for (std::set<std::string>::iterator it = tickers.begin(); it != tickers.end(); ++it)
-    {
-        market->attach(this, *it);
-    }
-}
-
 void TradingTechnique::adjustBalance(double amount)
 {
     fundBalance += amount;

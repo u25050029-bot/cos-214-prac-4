@@ -66,17 +66,25 @@ void BenchmarkComparisonDecorator::onPriceUpdate(std::string ticker, double pric
     compareGrowth();
 }
 
-bool BenchmarkComparisonDecorator::hasBenchmarkSignal() const
+void BenchmarkComparisonDecorator::consumeOwnSignal(std::vector<Signal> &out)
 {
-    return benchmarkSignalRaised;
-}
-
-void BenchmarkComparisonDecorator::consumeSignals(std::vector<Signal> &out)
-{
-    WorkerDecorator::consumeSignals(out);
     if (benchmarkSignalRaised)
     {
-        out.push_back(Signal(trackedTicker, benchmarkSignalType, "now", 1.0));
+        out.push_back(Signal(trackedTicker, benchmarkSignalType, 1.0));
         benchmarkSignalRaised = false;
     }
+}
+
+void BenchmarkComparisonDecorator::flatten(std::vector<WorkItem *> &out)
+{
+    WorkerDecorator::flatten(out);
+    if (benchmarkSignalRaised)
+    {
+        out.push_back(this);
+    }
+}
+
+bool BenchmarkComparisonDecorator::isSignalReady() const
+{
+    return benchmarkSignalRaised || WorkerDecorator::isSignalReady();
 }

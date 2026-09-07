@@ -6,12 +6,8 @@
 
 class Division : public WorkerGroup
 {
-private:
-    std::string tickerFocus;
-
 public:
-    Division(std::string tickerFocus);
-    std::string getTickerFocus() const;
+    Division();
 };
 
 #endif

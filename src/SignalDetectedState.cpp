@@ -1,5 +1,6 @@
 #include "SignalDetectedState.h"
 #include "ExecutingState.h"
+#include "CooldownState.h"
 #include "Worker.h"
 
 void SignalDetectedState::handleUpdate(Worker *context, double price)
@@ -21,6 +22,11 @@ void SignalDetectedState::handleUpdate(Worker *context, double price)
     if (stillValid)
     {
         context->setState(new ExecutingState());
+    }
+    else
+    {
+        context->clearSignal();
+        context->setState(new CooldownState());
     }
 }
 

@@ -1,11 +1,5 @@
 #include "Division.h"
 
-Division::Division(std::string tickerFocus)
+Division::Division()
 {
-    this->tickerFocus = tickerFocus;
-}
-
-std::string Division::getTickerFocus() const
-{
-    return tickerFocus;
 }

@@ -25,7 +25,7 @@ public:
 
     void onPriceUpdate(std::string ticker, double price) override;
 
-    void subscribeTo(StockMarket *market);
+    void subscribeAll(StockMarket *market);
 
     void runCycle(WorkItem *root);
 };

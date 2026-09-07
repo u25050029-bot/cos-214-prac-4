@@ -24,7 +24,7 @@ void Trader::onPriceUpdate(std::string ticker, double price)
     }
 }
 
-void Trader::subscribeTo(StockMarket *market)
+void Trader::subscribeAll(StockMarket *market)
 {
     if (technique == nullptr || market == nullptr)
     {
@@ -89,7 +89,13 @@ std::vector<Signal> Trader::gatherSignals(WorkItem *root)
     {
         return signals;
     }
-    root->consumeSignals(signals);
+
+    WorkItemIterator *it = root->createIterator("signal");
+    while (it->hasNext())
+    {
+        it->next()->consumeOwnSignal(signals);
+    }
+    delete it;
     return signals;
 }
 
@@ -118,13 +124,13 @@ Signal Trader::combineForTicker(const std::vector<Signal> &signals)
 
     if (hasSell)
     {
-        return Signal(ticker, SignalType::SELL, "now", sellQty > 0.0 ? sellQty : 1.0);
+        return Signal(ticker, SignalType::SELL, sellQty > 0.0 ? sellQty : 1.0);
     }
     if (hasBuy)
     {
-        return Signal(ticker, SignalType::BUY, "now", buyQty);
+        return Signal(ticker, SignalType::BUY, buyQty);
     }
-    return Signal(ticker, SignalType::HOLD, "now", 0.0);
+    return Signal(ticker, SignalType::HOLD, 0.0);
 }
 
 void Trader::runCycle(WorkItem *root)
