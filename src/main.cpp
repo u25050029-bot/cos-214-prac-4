@@ -183,10 +183,10 @@ int main()
 
     TradeExecutor *riskLayer = new RiskManagementDecorator(executor, 0.5, 100.0); // inner, maxTradePct, maxTickerExposure
 
-    // A restricted ticker so compliance's veto path is exercised.
+    // Restricted list starts empty so every instrument can trade in the first
+    // half of the run; PEP gets banned at the midpoint (a runtime change).
     std::vector<std::string> restrictedTickers;
-    restrictedTickers.push_back(PEP.ticker);
-    TradeExecutor *complianceLayer = new ComplianceReviewDecorator(riskLayer, momentumFund, restrictedTickers); // inner, technique, restrictedList
+    ComplianceReviewDecorator *complianceLayer = new ComplianceReviewDecorator(riskLayer, momentumFund, restrictedTickers); // inner, technique, restrictedList
     // Observer
     Trader *deskTrader = new Trader(momentumFund, complianceLayer); // technique, chain  // will own the root
     deskTrader->subscribeTo(&exchange);
@@ -273,7 +273,49 @@ int main()
     exchange.setStockPrice(SPX.ticker, SPX.baseline);
     exchange.tick(SPX.ticker, SPX.baseline);
 
-    for (int i = 0; i < TOTAL_TICKS; i++)
+    const int HALF = TOTAL_TICKS / 2;
+
+    // --- First half of the run --------------------------------------------
+    for (int i = 0; i < HALF; i++)
+    {
+        const MarketEvent &ev = schedule[i];
+        double price = ev.instrument.baseline * eventMultiplier(ev.kind);
+        exchange.setStockPrice(ev.instrument.ticker, price);
+        exchange.tick(ev.instrument.ticker, price); // notifies deskTrader
+    }
+
+    // --- Runtime change at the midpoint -----------------------------------
+    // A meaningful structural + behavioural change while the system is live:
+    //   1. add a new analyst, wrapped in a watchlist + benchmark decorator,
+    //      into the fund's tree (structural change to the composite); and
+    //   2. ban PEP by adding it to compliance's restricted list (behavioural
+    //      change to the decision chain).
+    std::cout << "\n--- midpoint runtime change (tick " << HALF << ") ---" << std::endl;
+
+    Worker *lateAnalyst = new Worker("late-analyst", KO.ticker, 8); // workerId, ticker, referenceWindow
+    std::vector<std::string> lateExtra;
+    lateExtra.push_back(NVDA.ticker);
+    WatchlistDecorator *lateWatched = new WatchlistDecorator(lateAnalyst, lateExtra);                                                           // wrapped, extraTickers
+    BenchmarkComparisonDecorator *lateBenched = new BenchmarkComparisonDecorator(lateWatched, KO.ticker, SPX.ticker, KO.baseline, SPX.baseline); // wrapped, trackedTicker, indexTicker, trackedBaseline, indexBaseline
+    momentumFund->add(lateBenched);                                                                                                             // structural change: new item joins the tree
+    std::cout << "  added 'late-analyst' (watchlist + benchmark decorated) to the fund" << std::endl;
+
+    complianceLayer->restrict(PEP.ticker); // behavioural change: PEP now banned
+    std::cout << "  PEP is now restricted - further PEP trades will be vetoed" << std::endl;
+
+    // Drive a clear PEP move so the new restriction is visibly exercised. PEP
+    // needs to build its reference (window 8) first, then a confirmed drop: it
+    // would raise a SELL, but compliance now vetoes it to HOLD.
+    for (int t = 0; t < 9; ++t)
+        exchange.tick(PEP.ticker, PEP.baseline);
+    exchange.tick(PEP.ticker, PEP.baseline * 0.95);
+    exchange.tick(PEP.ticker, PEP.baseline * 0.94);
+    exchange.tick(PEP.ticker, PEP.baseline * 0.93);
+    std::cout << "--- resuming run ---\n"
+              << std::endl;
+
+    // --- Second half of the run -------------------------------------------
+    for (int i = HALF; i < TOTAL_TICKS; i++)
     {
         const MarketEvent &ev = schedule[i];
         double price = ev.instrument.baseline * eventMultiplier(ev.kind);

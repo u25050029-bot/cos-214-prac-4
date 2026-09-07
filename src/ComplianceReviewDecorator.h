@@ -23,6 +23,8 @@ public:
                               std::vector<std::string> restrictedList);
     ~ComplianceReviewDecorator() override;
 
+    void restrict(const std::string &ticker);
+
     Signal execute(Signal decision) override;
 };
 
