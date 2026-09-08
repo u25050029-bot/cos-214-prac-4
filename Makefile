@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -g -Isrc
+CXXFLAGS := -std=c++11 -Wall -Wextra -g -O0 -Isrc -MMD -MP
 LDFLAGS  :=
 
 TARGET   := taskforge
@@ -9,6 +9,7 @@ BUILD_DIR := build
 
 SOURCES := main.cpp $(wildcard $(SRC_DIR)/*.cpp)
 OBJECTS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(notdir $(SOURCES)))
+DEPS    := $(OBJECTS:.o=.d)
 
 vpath %.cpp . $(SRC_DIR)
 
@@ -32,7 +33,9 @@ debug: $(TARGET)
 	gdb ./$(TARGET)
 
 memcheck: $(TARGET)
-	valgrind --leak-check=full --show-leak-kinds=all ./$(TARGET)
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(TARGET)
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
+
+-include $(DEPS)

@@ -1,0 +1,10 @@
+build/
+taskforge
+*.o
+*.d
+.git/
+.gitignore
+*.log
+core
+core.*
+vgcore.*
